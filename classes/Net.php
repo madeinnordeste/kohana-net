@@ -1,26 +1,43 @@
-<?php defined('SYSPATH') or die('No direct script access.');
+<?php defined('SYSPATH') OR die('No direct script access.');
 
-class Net{
+class Net {
 
-    public static function ip(){
-        $ip = isset($_SERVER['HTTP_X_FORWARDED_FOR']) ? $_SERVER['HTTP_X_FORWARDED_FOR'] : $_SERVER['REMOTE_ADDR'];
-        return trim($ip);
+    const URL_GEOIP = 'http://freegeoip.net/json/';
+
+    public function ip()
+    {
+        return Request::$client_ip;
     }
 
-    public static function ip_data($ip=FALSE){
-
-        $ip = (!$ip) ? Net::ip() : $ip;
-
-        $url = 'http://freegeoip.net/json/'.$ip;
-        try {
-            $content = file_get_contents($url);
-            $obj = json_decode($content);
-            return $obj;
-
-        } catch (Exception $e) {
-            return FALSE;
+    /**
+     * 
+     * 
+     * @link http://php.net/geoip-record-by-name
+     * @link http://freegeoip.net
+     */
+    public function ip_data($ip = NULL)
+    {
+        if ( ! $ip)
+        {
+            $ip = $this->ip();
+        }
+        elseif ( ! Valid::ip($ip) OR ! Valid::url($ip))
+        {
+            throw new Kohana_Exception(
+                ':method: invalid IP address :ip',
+                array(':method' => __METHOD__, ':ip' => $ip)
+            );
+        }
+        
+        if (function_exists('geoip_record_by_name'))
+        {
+            return geoip_record_by_name($ip);
         }
 
+        $options = class_exists('Cache') ? array('cache' => Cache::instance()) : array();
+        $response = Request::factory(self::URL_GEOIP . $ip, $options)->execute()->body();
+        
+       return $response ? json_decode(trim($response), TRUE) : FALSE;
     }
     
 }
